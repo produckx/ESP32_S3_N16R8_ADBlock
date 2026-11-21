@@ -1,110 +1,235 @@
 #pragma once
 // Dashboard HTML for the ProDuckX-DNS web UI, kept in its own header so the
 // Arduino IDE preprocessor doesn't choke on the inlined markup (issue #6).
+// Giao diện dùng CDN (Tailwind, Chart.js, DataTables, Font Awesome) — chỉ áp
+// dụng cho dashboard (client ở LAN có internet). Trang setup AP dùng CSS nhúng.
 
-const char PAGE[] PROGMEM = R"HTML(<!doctype html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1">
-<title>ProDuckX-DNS</title><style>
-body{font:14px system-ui,sans-serif;margin:0;background:#0d1117;color:#c9d1d9}
-header{background:#161b22;padding:14px 18px;border-bottom:1px solid #30363d}
-h1{margin:0;font-size:18px}h1 span{color:#3fb950}.wrap{padding:16px;max-width:1000px;margin:auto}
-.cards{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
-.card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;flex:1;min-width:120px}
-.card .v{font-size:22px;font-weight:600}.card .l{color:#8b949e;font-size:12px}
-table{width:100%;border-collapse:collapse;background:#161b22;border-radius:8px;overflow:hidden;margin-bottom:18px}
-th,td{padding:8px 10px;text-align:left;border-bottom:1px solid #21262d;font-size:13px}
-th{background:#21262d;color:#8b949e}tr:hover td{background:#1c2128}
-.b{color:#f85149}.a{color:#3fb950}.tag{background:#30363d;border-radius:4px;padding:1px 6px;font-size:11px}
-button{background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:5px;padding:4px 9px;cursor:pointer}
-button:hover{background:#30363d}.ban{color:#f85149}input{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;border-radius:5px;padding:6px}
-h2{font-size:14px;color:#8b949e;margin:18px 0 8px}
-/* bảng client: không cho MAC/IP xuống dòng, cuộn ngang khi màn hình hẹp */
-.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;margin-bottom:18px}
-.tw table{margin-bottom:0}
-#ct th,#ct td{white-space:nowrap}
-#ct td:first-child{white-space:normal;word-break:break-all;min-width:130px}
-#ct td:nth-child(2){font-family:ui-monospace,Consolas,monospace;font-size:12px;color:#8b949e}
-/* lịch sử: tối đa 10 dòng hiển thị, cuộn dọc khi nhiều hơn */
-.hist{max-height:352px;overflow-y:auto;border-radius:8px;margin-bottom:18px}
-.hist table{margin-bottom:0}
-.hist thead th{position:sticky;top:0;z-index:1}
-#ht td:first-child{word-break:break-all}
-</style></head><body>
-<header><h1>🛡️ ProDuckX-DNS <span id=host></span></h1></header><div class=wrap>
-<div id=credwarn style="display:none;background:#3b1d1d;border:1px solid #f85149;color:#ffb3ae;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px">
-⚠️ <b>Default credentials in use.</b> WEB_PASS/OTA_PASS in <code>secrets.h</code> are still the placeholder values — anyone can read them in the public repo. Set real values and reflash.
+const char PAGE[] PROGMEM = R"HTML(<!doctype html><html lang=vi><head><meta charset=utf-8>
+<meta name=viewport content="width=device-width,initial-scale=1"><meta name=color-scheme content=dark>
+<title>ProDuckX-DNS</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel=stylesheet href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<link rel=stylesheet href="https://cdn.datatables.net/2.0.8/css/dataTables.dataTables.min.css">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+body{background:radial-gradient(1200px 600px at 10% -10%,#0b2942 0,transparent 55%),radial-gradient(900px 500px at 100% 0,#1e1b4b 0,transparent 50%),#020617}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.anim{animation:fadeUp .45s ease both}
+.glass{background:rgba(15,23,42,.72);backdrop-filter:blur(10px);border:1px solid #1e293b}
+.dataTables_wrapper{color:#cbd5e1}
+.dataTables_wrapper .dt-search input,.dataTables_wrapper select{background:#0f172a;border:1px solid #334155;border-radius:.5rem;padding:.4rem .7rem;color:#e2e8f0}
+table.dataTable tbody tr{background:transparent!important}
+table.dataTable tbody tr:hover{background:#1e293b!important}
+table.dataTable thead th{color:#94a3b8!important;border-bottom:1px solid #334155!important;background:transparent!important}
+table.dataTable td{border-bottom:1px solid #1e293b!important}
+.dataTables_wrapper .dt-info,.dataTables_wrapper .dt-length{color:#64748b;font-size:12px}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#334155;border-radius:6px}
+</style></head>
+<body class="min-h-screen text-slate-200 antialiased">
+<header class="sticky top-0 z-20 glass border-b border-slate-800">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+    <div class="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-400 grid place-items-center text-xl"><i class="fa-solid fa-shield-halved"></i></div>
+    <div>
+      <h1 class="text-lg font-semibold leading-tight">ProDuckX-DNS <span id=host class="text-emerald-400 text-sm font-normal"></span></h1>
+      <p class="text-[11px] text-slate-500">DNS sinkhole · ESP32-S3</p>
+    </div>
+    <div class="ml-auto flex items-center gap-2 text-xs text-slate-400">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span>online</span>
+    </div>
+  </div>
+</header>
+<div class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+<div id=credwarn class="hidden rounded-xl border border-rose-600/60 bg-rose-950/40 text-rose-200 px-4 py-3 text-sm anim">
+  <i class="fa-solid fa-triangle-exclamation mr-1"></i> <b>Default credentials in use.</b> WEB_PASS/OTA_PASS trong <code>secrets.h</code> vẫn là giá trị mặc định. Hãy đổi rồi nạp lại.
 </div>
-<div class=cards id=sys></div>
-<h2>CLIENTS</h2><div class=tw><table id=ct><thead><tr><th>Client</th><th>MAC</th><th>Blocked</th><th>Allowed</th><th></th></tr></thead><tbody></tbody></table></div>
-<h2>CUSTOM BLOCKED DOMAINS</h2>
-<div style=margin-bottom:8px><input id=dom placeholder="ads.example.com" size=30><button onclick=addDom()>Block domain</button></div>
-<table id=cl><tbody></tbody></table>
-<h2>WHITELIST &mdash; ALWAYS ALLOWED</h2>
-<div style=margin-bottom:8px><input id=wdom placeholder="analytics.example.com" size=30><button onclick=addWhite()>Allow domain</button></div>
-<div style="color:#8b949e;font-size:12px;margin-bottom:6px">whitelist wins over the blocklist: the domain and its subdomains are never blocked</div>
-<table id=wl><tbody></tbody></table>
-<h2>BLOCKLIST &mdash; UPLOAD</h2>
-<form id=upf style=margin-bottom:6px><input type=file id=blf accept=.bin><button>Upload blocklist</button> <span id=upmsg style=color:#8b949e></span></form>
-<div style="color:#8b949e;font-size:12px;margin-bottom:18px">build <code>blocklist.bin</code> with <code>tools/build_blocklist.py</code>, then upload here &mdash; no USB</div>
-<h2>BLOCKLIST &mdash; REMOTE AUTO-UPDATE</h2>
-<div style=margin-bottom:6px><input id=uurl placeholder="https://host/blocklist.bin" size=40> every <input id=uiv size=2 value=24>h
-<button onclick=saveUpd()>Save</button> <button onclick=fetchNow()>Fetch now</button></div>
-<div style="color:#8b949e;font-size:12px;margin-bottom:18px">device pulls a prebuilt <code>blocklist.bin</code> on a schedule (e.g. a GitHub release asset). last: <span id=ustat>&mdash;</span></div>
-<h2>NETWORK &mdash; STATIC IP</h2>
-<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:8px">
-  <div><label style="display:block;font-size:12px;color:#8b949e;margin-bottom:3px">IP Address</label><input id=netip placeholder="192.168.1.50" size=14></div>
-  <div><label style="display:block;font-size:12px;color:#8b949e;margin-bottom:3px">Gateway</label><input id=netgw placeholder="192.168.1.1" size=14></div>
-  <div><label style="display:block;font-size:12px;color:#8b949e;margin-bottom:3px">Subnet Mask</label><input id=netsn placeholder="255.255.255.0" size=14></div>
-  <div><label style="display:block;font-size:12px;color:#8b949e;margin-bottom:3px">DNS Server</label><input id=netdns placeholder="1.1.1.1" size=14></div>
-  <div style="margin-bottom:2px"><button onclick=saveIP()>Save</button> <button onclick=setDhcp()>Use DHCP</button></div>
+
+<div class=grid id=sys></div>
+
+<div class="grid lg:grid-cols-3 gap-4">
+  <div class="glass rounded-2xl p-4 anim">
+    <h2 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Blocked vs Allowed</h2>
+    <div class="h-56"><canvas id=chartTotals></canvas></div>
+  </div>
+  <div class="glass rounded-2xl p-4 anim lg:col-span-2">
+    <h2 class="text-xs uppercase tracking-wider text-slate-400 mb-2">Top clients by blocked</h2>
+    <div class="h-56"><canvas id=chartClients></canvas></div>
+  </div>
 </div>
-<div style="margin-bottom:6px"><span id=netmsg style="color:#8b949e;font-size:12px"></span></div>
-<div style="color:#8b949e;font-size:12px;margin-bottom:18px">applies after a reboot. currently: <span id=netstate>&mdash;</span></div>
-<h2>BLOCKED PAGE REDIRECT</h2>
-<div style=margin-bottom:6px><input id=burl placeholder="0.0.0.0 (default) or https://block.mydomain.com" size=40>
-<button onclick=saveBlockUrl()>Save</button> <button onclick=resetBlockUrl()>Reset (0.0.0.0)</button> <span id=bmsg style=color:#8b949e></span></div>
-<div style="color:#8b949e;font-size:12px;margin-bottom:18px">default is 0.0.0.0. Enter a redirect URL (e.g. <code>https://block.mydomain.com</code>) to show when a domain is blocked.</div>
-<h2>WIFI</h2>
-<div style=margin-bottom:18px><button onclick="if(confirm('Forget saved WiFi and reboot into the setup portal?'))forgetWifi()">Forget WiFi</button></div>
-<h2>RECENTLY BLOCKED</h2>
-<div class=hist><table id=ht><thead><tr><th>Domain</th><th>Client</th><th>When</th></tr></thead><tbody></tbody></table></div>
-</div><script>
-function fmt(n){return n.toLocaleString()}
+
+<section class="glass rounded-2xl p-4 anim">
+  <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-users text-sky-400"></i><h2 class="font-semibold">Clients</h2></div>
+  <div class="overflow-x-auto"><table id=ct class="w-full text-sm">
+    <thead><tr><th>Client</th><th>MAC</th><th>Blocked</th><th>Allowed</th><th></th></tr></thead><tbody></tbody>
+  </table></div>
+</section>
+
+<div class="grid md:grid-cols-2 gap-4">
+  <section class="glass rounded-2xl p-4 anim">
+    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-ban text-rose-400"></i><h2 class="font-semibold">Custom blocked</h2></div>
+    <div class="flex gap-2 mb-3">
+      <input id=dom placeholder="ads.example.com" class="flex-1 rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm">
+      <button onclick=addDom() class="rounded-lg bg-rose-600 hover:bg-rose-500 px-3 py-2 text-sm font-medium text-white"><i class="fa-solid fa-plus mr-1"></i>Block</button>
+    </div>
+    <div class="max-h-64 overflow-y-auto"><table id=cl class="w-full text-sm"><tbody></tbody></table></div>
+  </section>
+  <section class="glass rounded-2xl p-4 anim">
+    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-check-double text-emerald-400"></i><h2 class="font-semibold">Whitelist</h2></div>
+    <div class="flex gap-2 mb-2">
+      <input id=wdom placeholder="analytics.example.com" class="flex-1 rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm">
+      <button onclick=addWhite() class="rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-sm font-medium text-white"><i class="fa-solid fa-plus mr-1"></i>Allow</button>
+    </div>
+    <p class="text-[11px] text-slate-500 mb-2">Whitelist thắng blocklist: domain và subdomain không bao giờ bị chặn.</p>
+    <div class="max-h-64 overflow-y-auto"><table id=wl class="w-full text-sm"><tbody></tbody></table></div>
+  </section>
+</div>
+
+<div class="grid md:grid-cols-2 gap-4">
+  <section class="glass rounded-2xl p-4 anim">
+    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-upload text-indigo-400"></i><h2 class="font-semibold">Blocklist — Upload</h2></div>
+    <form id=upf class="space-y-3">
+      <input type=file id=blf accept=.bin class="block w-full text-sm text-slate-300 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-white">
+      <button class="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-sm font-medium text-white">Upload blocklist</button>
+      <span id=upmsg class="text-slate-400 text-xs"></span>
+    </form>
+    <p class="text-[11px] text-slate-500 mt-3">Build bằng <code>tools/build_blocklist.py</code> rồi upload tại đây — không cần USB.</p>
+  </section>
+  <section class="glass rounded-2xl p-4 anim">
+    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-cloud-arrow-down text-cyan-400"></i><h2 class="font-semibold">Blocklist — Remote update</h2></div>
+    <div class="space-y-2">
+      <input id=uurl placeholder="https://host/blocklist.bin" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm">
+      <div class="flex items-center gap-2 text-sm">
+        <span class="text-slate-400">Mỗi</span><input id=uiv size=2 value=24 class="w-16 rounded-lg bg-slate-950 border border-slate-700 px-2 py-2 text-center"> <span class="text-slate-400">giờ</span>
+        <button onclick=saveUpd() class="ml-auto rounded-lg bg-slate-700 hover:bg-slate-600 px-3 py-2 text-sm">Save</button>
+        <button onclick=fetchNow() class="rounded-lg bg-cyan-600 hover:bg-cyan-500 px-3 py-2 text-sm text-white">Fetch now</button>
+      </div>
+      <p class="text-[11px] text-slate-500">Lần cập nhật cuối: <span id=ustat>—</span></p>
+    </div>
+  </section>
+</div>
+
+<section class="glass rounded-2xl p-4 anim">
+  <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-network-wired text-amber-400"></i><h2 class="font-semibold">Network — Static IP</h2></div>
+  <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+    <div><label class="block text-[11px] text-slate-400 mb-1">IP Address</label><input id=netip placeholder="192.168.1.50" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm"></div>
+    <div><label class="block text-[11px] text-slate-400 mb-1">Gateway</label><input id=netgw placeholder="192.168.1.1" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm"></div>
+    <div><label class="block text-[11px] text-slate-400 mb-1">Subnet Mask</label><input id=netsn placeholder="255.255.255.0" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm"></div>
+    <div><label class="block text-[11px] text-slate-400 mb-1">DNS Server</label><input id=netdns placeholder="1.1.1.1" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm"></div>
+    <div class="flex gap-2"><button onclick=saveIP() class="rounded-lg bg-amber-600 hover:bg-amber-500 px-3 py-2 text-sm text-white">Save</button><button onclick=setDhcp() class="rounded-lg bg-slate-700 hover:bg-slate-600 px-3 py-2 text-sm">DHCP</button></div>
+  </div>
+  <p class="text-[11px] text-slate-500 mt-3"><span id=netmsg></span> Áp dụng sau khi reboot. Hiện tại: <span id=netstate>—</span></p>
+</section>
+
+<div class="grid md:grid-cols-2 gap-4">
+  <section class="glass rounded-2xl p-4 anim">
+    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-arrow-up-right-from-square text-fuchsia-400"></i><h2 class="font-semibold">Blocked page redirect</h2></div>
+    <div class="flex gap-2 mb-2">
+      <input id=burl placeholder="0.0.0.0 (default)" class="flex-1 rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm">
+      <button onclick=saveBlockUrl() class="rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 px-3 py-2 text-sm text-white">Save</button>
+      <button onclick=resetBlockUrl() class="rounded-lg bg-slate-700 hover:bg-slate-600 px-3 py-2 text-sm">Reset</button>
+    </div>
+    <p class="text-[11px] text-slate-500"><span id=bmsg></span> Mặc định 0.0.0.0. Nhập URL để hiển thị khi bị chặn.</p>
+  </section>
+  <section class="glass rounded-2xl p-4 anim">
+    <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-wifi text-sky-400"></i><h2 class="font-semibold">WiFi</h2></div>
+    <button onclick="if(confirm('Forget saved WiFi and reboot into the setup portal?'))forgetWifi()" class="rounded-lg border border-rose-600/60 text-rose-300 hover:bg-rose-600/10 px-3 py-2 text-sm"><i class="fa-solid fa-trash-can mr-1"></i>Forget WiFi</button>
+  </section>
+</div>
+
+<section class="glass rounded-2xl p-4 anim">
+  <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-clock-rotate-left text-slate-300"></i><h2 class="font-semibold">Recently blocked</h2></div>
+  <div class="max-h-72 overflow-y-auto"><table id=ht class="w-full text-sm"><thead class="sticky top-0 bg-slate-900"><tr><th>Domain</th><th>Client</th><th>When</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+</div>
+<script>
+function fmt(n){return (n??0).toLocaleString()}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-// A plain <img>/<form> CSRF can't set a custom header, only same-origin fetch()
-// can — so requiring this on every mutating request blocks drive-by CSRF even
-// though the server can't otherwise tell a forged request from a real one over
-// plain HTTP Basic Auth (browsers auto-replay cached Basic Auth cross-origin).
 const CSRF_HDRS={'X-Requested-With':'produckx-adblock'}
-async function load(){let r=await fetch('/stats.json');if(r.status==401){location.href='/login';return;}let s=await r.json();
-host.textContent='@ '+s.ip;
-credwarn.style.display=s.defcreds?'block':'none';
-sys.innerHTML=[['Total blocked',fmt(s.blocked),'b'],['Total allowed',fmt(s.allowed),'a'],['Blocklist domains',fmt(s.domains),''],
-['Clients',s.clients.length,''],['CPU',(s.cpu??0)+'%',''],['RAM',(s.ram??0)+'%',''],['Uptime',s.uptime,'']]
-.map(c=>`<div class=card><div class="v ${c[2]}">${c[1]}</div><div class=l>${c[0]}</div></div>`).join('');
-ct.tBodies[0].innerHTML=s.clients.sort((a,b)=>(b.blocked+b.allowed)-(a.blocked+a.allowed)).map(c=>
-`<tr><td>${c.ip}${c.banned?' <span class=tag style=color:#f85149>BANNED</span>':''}</td><td>${c.mac}</td>
-<td class=b>${fmt(c.blocked)}</td><td class=a>${fmt(c.allowed)}</td>
-<td><button class=ban data-ip="${c.ip}">${c.banned?'Unban':'Ban'}</button></td></tr>`).join('');
-cl.tBodies[0].innerHTML=s.custom.map(d=>`<tr><td>${esc(d)}</td><td style=text-align:right><button class=rmbtn data-d="${esc(d)}">remove</button></td></tr>`).join('')||'<tr><td style=color:#8b949e>none yet</td></tr>';
-wl.tBodies[0].innerHTML=s.white.map(d=>`<tr><td>${esc(d)}</td><td style=text-align:right><button class=wrm data-d="${esc(d)}">remove</button></td></tr>`).join('')||'<tr><td style=color:#8b949e>none yet</td></tr>';
-ht.tBodies[0].innerHTML=s.hist.map(h=>`<tr><td>${esc(h.d)}</td><td>${h.ip}</td><td>${h.t<60?h.t+'s ago':Math.round(h.t/60)+'m ago'}</td></tr>`).join('')||'<tr><td colspan=3 style=color:#8b949e>nothing blocked yet</td></tr>';
-netstate.textContent=s.staticip?'static':'DHCP';
-if(!netEdited){netip.value=s.netip||'';netgw.value=s.netgw||'';netsn.value=s.netsubnet||'';netdns.value=s.netdns||'';}
-if(document.activeElement!=burl)burl.value=s.blockurl||'';
-if(document.activeElement!=uurl)uurl.value=s.upurl||'';
-if(document.activeElement!=uiv)uiv.value=s.upiv||24;
-ustat.textContent=s.upstat||'—';}
+let netEdited=false,dtClients=null,chartTotals=null,chartClients=null;
+
+// Khởi tạo DataTables + Chart.js; nếu CDN bị chặn thì tự fallback, không vỡ trang.
+try{
+  if(window.jQuery&&window.DataTable){
+    dtClients=$('#ct').DataTable({paging:true,pageLength:10,lengthChange:false,searching:true,info:true,ordering:false,autoWidth:false});
+  }
+}catch(e){dtClients=null}
+try{
+  if(window.Chart){
+    chartTotals=new Chart(document.getElementById('chartTotals'),{type:'doughnut',
+      data:{labels:['Blocked','Allowed'],datasets:[{data:[0,0],backgroundColor:['#f85149','#3fb950'],borderWidth:0}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'66%',plugins:{legend:{labels:{color:'#cbd5e1',boxWidth:12}}}}});
+    chartClients=new Chart(document.getElementById('chartClients'),{type:'bar',
+      data:{labels:[],datasets:[{label:'Blocked',data:[],backgroundColor:'#38bdf8',borderRadius:6}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{color:'#94a3b8'},grid:{display:false}},y:{ticks:{color:'#94a3b8'},grid:{color:'#1e293b'}}}}});
+  }
+}catch(e){chartTotals=null;chartClients=null}
+
+function clientRows(arr){
+  return arr.sort((a,b)=>(b.blocked+b.allowed)-(a.blocked+a.allowed)).map(c=>[
+    '<div class="font-medium">'+esc(c.ip)+(c.banned?' <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-rose-600/20 text-rose-400">BANNED</span>':'')+'</div>',
+    '<span class="font-mono text-xs text-slate-400">'+esc(c.mac)+'</span>',
+    c.blocked, c.allowed,
+    '<button class="ban text-xs rounded-md border px-2 py-1 '+(c.banned?'border-emerald-600 text-emerald-400':'border-rose-600 text-rose-400')+'" data-ip="'+c.ip+'">'+(c.banned?'Unban':'Ban')+'</button>'
+  ]);
+}
+function renderClients(arr){
+  let rows=clientRows(arr).map(r=>[r[0],r[1],'<span class="text-rose-400">'+fmt(r[2])+'</span>','<span class="text-emerald-400">'+fmt(r[3])+'</span>',r[4]]);
+  if(dtClients){dtClients.clear();rows.forEach(r=>dtClients.row.add(r));dtClients.draw(false);}
+  else{ct.tBodies[0].innerHTML=rows.map(r=>'<tr>'+r.map(h=>'<td class="px-3 py-2 border-b border-slate-800">'+h+'</td>').join('')+'</tr>').join('');}
+}
+// Thẻ thống kê: tạo DOM 1 lần, sau đó chỉ cập nhật text để không nháy khi refresh.
+const CARDS=[
+  {icon:'fa-shield-halved',color:'text-rose-400',label:'Total blocked',cls:''},
+  {icon:'fa-check',color:'text-emerald-400',label:'Total allowed',cls:''},
+  {icon:'fa-database',color:'text-sky-400',label:'Blocklist domains',cls:''},
+  {icon:'fa-users',color:'text-indigo-400',label:'Clients',cls:''},
+  {icon:'fa-microchip',color:'text-amber-400',label:'CPU',cls:''},
+  {icon:'fa-memory',color:'text-fuchsia-400',label:'RAM',cls:''},
+  {icon:'fa-hourglass-half',color:'text-slate-300',label:'Uptime',cls:'col-span-2 lg:col-span-4 xl:col-span-7'}
+];
+function buildCards(){
+  sys.className='grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3';
+  sys.innerHTML=CARDS.map((c,i)=>'<div class="glass rounded-2xl p-4 flex items-center gap-3 anim '+c.cls+'"><div class="w-10 h-10 rounded-xl grid place-items-center text-lg '+c.color+' bg-slate-800/60"><i class="fa-solid '+c.icon+'"></i></div><div><div id="cardv'+i+'" class="text-2xl font-semibold '+c.color+'">-</div><div class="text-[11px] text-slate-400">'+c.label+'</div></div></div>').join('');
+}
+
+async function load(){
+  let r=await fetch('/stats.json');if(r.status==401){location.href='/login';return;}
+  let s=await r.json();
+  host.textContent='@ '+s.ip;
+  credwarn.style.display=s.defcreds?'block':'none';
+  const vals=[fmt(s.blocked),fmt(s.allowed),fmt(s.domains),s.clients.length,(s.cpu??0)+'%',(s.ram??0)+'%',s.uptime];
+  vals.forEach((v,i)=>{const el=document.getElementById('cardv'+i);if(el)el.textContent=v;});
+  renderClients(s.clients);
+  cl.tBodies[0].innerHTML=s.custom.map(d=>'<tr><td class="px-3 py-2 border-b border-slate-800">'+esc(d)+'</td><td class="text-right"><button class=rmbtn data-d="'+esc(d)+'" class="text-xs text-rose-400 hover:underline">remove</button></td></tr>').join('')||'<tr><td class="px-3 py-2 text-slate-500">none yet</td></tr>';
+  wl.tBodies[0].innerHTML=s.white.map(d=>'<tr><td class="px-3 py-2 border-b border-slate-800">'+esc(d)+'</td><td class="text-right"><button class=wrm data-d="'+esc(d)+'" class="text-xs text-rose-400 hover:underline">remove</button></td></tr>').join('')||'<tr><td class="px-3 py-2 text-slate-500">none yet</td></tr>';
+  ht.tBodies[0].innerHTML=s.hist.map(h=>'<tr><td class="px-3 py-2 border-b border-slate-800">'+esc(h.d)+'</td><td class="px-3 py-2 border-b border-slate-800 text-slate-400">'+h.ip+'</td><td class="px-3 py-2 border-b border-slate-800 text-slate-400">'+(h.t<60?h.t+'s ago':Math.round(h.t/60)+'m ago')+'</td></tr>').join('')||'<tr><td colspan=3 class="px-3 py-2 text-slate-500">nothing blocked yet</td></tr>';
+  netstate.textContent=s.staticip?'static':'DHCP';
+  if(!netEdited){netip.value=s.netip||'';netgw.value=s.netgw||'';netsn.value=s.netsubnet||'';netdns.value=s.netdns||'';}
+  if(document.activeElement!=burl)burl.value=s.blockurl||'';
+  if(document.activeElement!=uurl)uurl.value=s.upurl||'';
+  if(document.activeElement!=uiv)uiv.value=s.upiv||24;
+  ustat.textContent=s.upstat||'—';
+  if(chartTotals){chartTotals.data.datasets[0].data=[s.blocked,s.allowed];chartTotals.update('none');}
+  if(chartClients){
+    let top=s.clients.slice().sort((a,b)=>b.blocked-a.blocked).slice(0,5);
+    chartClients.data.labels=top.map(c=>c.ip);
+    chartClients.data.datasets[0].data=top.map(c=>c.blocked);
+    chartClients.update('none');
+  }
+}
 function addDom(){let d=dom.value.trim();if(d){fetch('/addblock?d='+encodeURIComponent(d),{headers:CSRF_HDRS}).then(()=>{dom.value='';load()})}}
 ct.addEventListener('click',e=>{if(e.target.classList.contains('ban'))fetch('/ban?ip='+e.target.dataset.ip,{headers:CSRF_HDRS}).then(load)});
 cl.addEventListener('click',e=>{if(e.target.classList.contains('rmbtn'))fetch('/unblock?d='+encodeURIComponent(e.target.dataset.d),{headers:CSRF_HDRS}).then(load)});
 function addWhite(){let d=wdom.value.trim();if(d){fetch('/addwhite?d='+encodeURIComponent(d),{headers:CSRF_HDRS}).then(()=>{wdom.value='';load()})}}
 wl.addEventListener('click',e=>{if(e.target.classList.contains('wrm'))fetch('/unwhite?d='+encodeURIComponent(e.target.dataset.d),{headers:CSRF_HDRS}).then(load)});
-let netEdited=false;
 [netip,netgw,netsn,netdns].forEach(el=>el.addEventListener('input',()=>{netEdited=true;}));
 function saveIP(){let ip=netip.value.trim(),gw=netgw.value.trim(),sn=netsn.value.trim(),dns=netdns.value.trim();
 if(!ip||!gw||!sn||!dns){netmsg.textContent='fill all four fields';return;}
-netmsg.textContent='saving...';
-netEdited=false;
+netmsg.textContent='saving...';netEdited=false;
 fetch('/setip?ip='+encodeURIComponent(ip)+'&gw='+encodeURIComponent(gw)+'&subnet='+encodeURIComponent(sn)+'&dns='+encodeURIComponent(dns),{headers:CSRF_HDRS})
 .then(async r=>{netmsg.textContent=r.ok?'✓ saved, rebooting to apply':'✗ '+await r.text()}).catch(()=>netmsg.textContent='✓ rebooting...');}
 function setDhcp(){if(!confirm('Switch back to DHCP and reboot?'))return;netmsg.textContent='saving...';
@@ -121,5 +246,5 @@ let fd=new FormData();fd.append('f',f);
 try{let r=await fetch('/upload',{method:'POST',headers:CSRF_HDRS,body:fd});upmsg.textContent=r.ok?'✓ updated':'✗ '+await r.text();}
 catch(_){upmsg.textContent='✗ upload failed';}
 blf.value='';setTimeout(load,600);};
-load();setInterval(load,3000);
+buildCards();load();setInterval(load,3000);
 </script></body></html>)HTML";

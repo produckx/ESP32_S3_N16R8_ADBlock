@@ -121,6 +121,8 @@ Giá trị mặc định khi chưa cấu hình (có thể override qua `build_fl
 ## Dashboard & API
 
 - `http://produckx.local` (hoặc IP thiết bị), đăng nhập bằng `WEB_USER`/`WEB_PASS`.
+- Giao diện dashboard dùng CDN: **Tailwind CSS, Chart.js, DataTables, Font Awesome** (cần internet ở máy client). Nếu CDN bị chặn, JS tự fallback và trang vẫn hoạt động.
+- Trang **login** và **setup WiFi** dùng CSS nhúng sẵn (không cần internet) — quan trọng vì AP setup không có mạng.
 - Các endpoint chính: `/stats.json`, `/ban`, `/addblock`, `/unblock`, `/addwhite`, `/unwhite`, `/pause`, `/resume`, `/setupdate`, `/setdns`, `/setip`, `/setdhcp`, `/upload`, `/update`.
 - Mọi endpoint thay đổi trạng thái yêu cầu header `X-Requested-With: produckx-adblock` + session cookie.
 

@@ -710,15 +710,27 @@ static void sendLoginPage(const String& err) {
   String html =
     "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
     "<title>ProDuckX-DNS &mdash; login</title>"
-    "<body style='font:16px system-ui,sans-serif;max-width:360px;margin:70px auto;padding:0 16px;background:#0d1117;color:#c9d1d9'>"
-    "<h2>&#128737; ProDuckX-DNS</h2>"
+    "<style>"
+    "*{box-sizing:border-box}"
+    "body{margin:0;min-height:100vh;display:grid;place-items:center;font:15px system-ui,sans-serif;color:#e2e8f0;"
+    "background:radial-gradient(900px 500px at 10% -10%,#0b2942,transparent 55%),radial-gradient(700px 400px at 100% 0,#1e1b4b,transparent 50%),#020617}"
+    ".card{width:380px;max-width:92vw;background:rgba(15,23,42,.75);border:1px solid #1e293b;border-radius:20px;padding:30px;backdrop-filter:blur(12px);box-shadow:0 20px 60px rgba(0,0,0,.45)}"
+    ".logo{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:26px;background:rgba(16,185,129,.15);margin-bottom:14px}"
+    "h1{margin:0;font-size:20px}p.sub{margin:4px 0 22px;color:#64748b;font-size:13px}"
+    "label{display:block;font-size:12px;color:#94a3b8;margin:12px 0 6px}"
+    "input{width:100%;padding:12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;font-size:14px;outline:none}"
+    "input:focus{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15)}"
+    "button{width:100%;margin-top:20px;padding:12px;border:0;border-radius:10px;background:#10b981;color:#04120c;font-weight:700;font-size:15px;cursor:pointer}"
+    "button:hover{background:#34d399}.err{margin-top:14px;padding:10px;border-radius:8px;background:rgba(244,63,94,.12);color:#fda4af;font-size:13px}"
+    "</style>"
+    "<body><div class=card><div class=logo>&#128737;</div><h1>ProDuckX-DNS</h1><p class=sub>Dang nhap dashboard</p>"
     "<form method=POST action=/login>"
-    "<input name=u placeholder='Username' autocomplete=username autofocus style='width:100%;box-sizing:border-box;padding:11px;margin:6px 0;border-radius:6px;border:1px solid #30363d;background:#161b22;color:#c9d1d9'>"
-    "<input name=p type=password placeholder='Password' autocomplete=current-password style='width:100%;box-sizing:border-box;padding:11px;margin:6px 0;border-radius:6px;border:1px solid #30363d;background:#161b22;color:#c9d1d9'>"
-    "<button style='width:100%;padding:12px;margin-top:8px;border-radius:6px;border:0;background:#3fb950;color:#000;font-weight:600;cursor:pointer'>Sign in</button>"
+    "<label>Username</label><input name=u placeholder='Username' autocomplete=username autofocus>"
+    "<label>Password</label><input name=p type=password placeholder='Password' autocomplete=current-password>"
+    "<button>Dang nhap</button>"
     "</form>";
-  if (err.length()) html += "<p style='color:#f85149'>" + htmlEscape(err) + "</p>";
-  html += "</body>";
+  if (err.length()) html += "<p class=err>" + htmlEscape(err) + "</p>";
+  html += "</div></body>";
   web.send(200, "text/html", html);
 }
 static void handleLoginPost() {
@@ -1052,23 +1064,38 @@ static void handlePortalRoot() {
   String html =
     "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
     "<title>ProDuckX-DNS setup</title>"
-    "<body style='font:16px system-ui,sans-serif;max-width:420px;margin:36px auto;padding:0 16px;background:#0d1117;color:#c9d1d9'>"
-    "<h2>&#128737; ProDuckX-DNS &mdash; WiFi setup</h2>"
-    "<p style='color:#8b949e'>Pick your network and enter its password. The device restarts and joins it.</p>"
+    // CSS nhúng: trang setup chạy ở AP mode KHÔNG có internet nên không dùng CDN.
+    "<style>"
+    "*{box-sizing:border-box}"
+    "body{margin:0;min-height:100vh;display:grid;place-items:center;font:15px system-ui,sans-serif;color:#e2e8f0;"
+    "background:radial-gradient(900px 500px at 10% -10%,#0b2942,transparent 55%),radial-gradient(700px 400px at 100% 0,#1e1b4b,transparent 50%),#020617}"
+    ".card{width:440px;max-width:92vw;background:rgba(15,23,42,.75);border:1px solid #1e293b;border-radius:20px;padding:30px;backdrop-filter:blur(12px);box-shadow:0 20px 60px rgba(0,0,0,.45)}"
+    ".logo{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:26px;background:rgba(16,185,129,.15);margin-bottom:14px}"
+    "h1{margin:0;font-size:20px}p.sub{margin:4px 0 18px;color:#64748b;font-size:13px}"
+    "select,input{width:100%;padding:12px;margin:7px 0;border-radius:10px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;font-size:14px;outline:none}"
+    "select:focus,input:focus{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.15)}"
+    "button{border:0;border-radius:10px;cursor:pointer;font-weight:600}"
+    ".scan{width:100%;padding:10px;margin-bottom:4px;background:#1e293b;color:#cbd5e1;font-size:13px}"
+    ".scan:hover{background:#334155}"
+    ".go{width:100%;padding:13px;margin-top:14px;background:#10b981;color:#04120c;font-size:15px;font-weight:700}"
+    ".go:hover{background:#34d399}"
+    "</style>"
+    "<body><div class=card><div class=logo>&#128737;</div>"
+    "<h1>ProDuckX-DNS</h1><p class=sub>Chon WiFi va nhap mat khau. Thiet bi se khoi dong lai va ket noi.</p>"
     "<form method=POST action=/wifisave>"
     // A real <select> is usable on every phone; the datalist this used to be
     // renders an affordance in several in-app browsers but no list, so picking
     // a network looked impossible. Typing the name still covers hidden APs.
-    "<select name=s id=apsel style='width:100%;box-sizing:border-box;padding:11px;margin:6px 0;border-radius:6px;border:1px solid #30363d;background:#161b22;color:#c9d1d9'>" + portalOpts + "</select>"
-    "<button type=button onclick=rescan(this) style='width:100%;padding:9px;margin-bottom:6px;border-radius:6px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;cursor:pointer'>Scan again</button>"
-    "<input name=s2 placeholder='or type the WiFi name' style='width:100%;box-sizing:border-box;padding:11px;margin:6px 0;border-radius:6px;border:1px solid #30363d;background:#161b22;color:#c9d1d9'>"
-    "<input name=p type=password placeholder='Password' style='width:100%;box-sizing:border-box;padding:11px;margin:6px 0;border-radius:6px;border:1px solid #30363d;background:#161b22;color:#c9d1d9'>"
-    "<button style='width:100%;padding:12px;margin-top:8px;border-radius:6px;border:0;background:#3fb950;color:#000;font-weight:600;cursor:pointer'>Connect</button>"
+    "<select name=s id=apsel>" + portalOpts + "</select>"
+    "<button type=button class=scan onclick=rescan(this)>Quet lai</button>"
+    "<input name=s2 placeholder='hoac nhap ten WiFi (AP an)'>"
+    "<input name=p type=password placeholder='Mat khau WiFi'>"
+    "<button class=go>Ket noi</button>"
     "</form>"
-    "<script>async function rescan(b){b.disabled=true;b.textContent='Scanning...';"
+    "<script>async function rescan(b){b.disabled=true;b.textContent='Dang quet...';"
     "try{let r=await fetch('/scan');document.getElementById('apsel').innerHTML=await r.text();}"
-    "finally{b.disabled=false;b.textContent='Scan again';}}</script>"
-    "</body>";
+    "finally{b.disabled=false;b.textContent='Quet lai';}}</script>"
+    "</div></body>";
   web.send(200, "text/html", html);
 }
 static void handleWifiSave() {
