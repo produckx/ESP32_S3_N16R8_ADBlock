@@ -723,11 +723,11 @@ static void sendLoginPage(const String& err) {
     "button{width:100%;margin-top:20px;padding:12px;border:0;border-radius:10px;background:#10b981;color:#04120c;font-weight:700;font-size:15px;cursor:pointer}"
     "button:hover{background:#34d399}.err{margin-top:14px;padding:10px;border-radius:8px;background:rgba(244,63,94,.12);color:#fda4af;font-size:13px}"
     "</style>"
-    "<body><div class=card><div class=logo>&#128737;</div><h1>ProDuckX-DNS</h1><p class=sub>Dang nhap dashboard</p>"
+    "<body><div class=card><div class=logo>&#128737;</div><h1>ProDuckX-DNS</h1><p class=sub>Login to dashboard</p>"
     "<form method=POST action=/login>"
     "<label>Username</label><input name=u placeholder='Username' autocomplete=username autofocus>"
     "<label>Password</label><input name=p type=password placeholder='Password' autocomplete=current-password>"
-    "<button>Dang nhap</button>"
+    "<button>Login</button>"
     "</form>";
   if (err.length()) html += "<p class=err>" + htmlEscape(err) + "</p>";
   html += "</div></body>";
@@ -1092,9 +1092,9 @@ static void handlePortalRoot() {
     "<input name=p type=password placeholder='Mat khau WiFi'>"
     "<button class=go>Ket noi</button>"
     "</form>"
-    "<script>async function rescan(b){b.disabled=true;b.textContent='Dang quet...';"
+    "<script>async function rescan(b){b.disabled=true;b.textContent='Scanning...';"
     "try{let r=await fetch('/scan');document.getElementById('apsel').innerHTML=await r.text();}"
-    "finally{b.disabled=false;b.textContent='Quet lai';}}</script>"
+    "finally{b.disabled=false;b.textContent='Scan';}}</script>"
     "</div></body>";
   web.send(200, "text/html", html);
 }
