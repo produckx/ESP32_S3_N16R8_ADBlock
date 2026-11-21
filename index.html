@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Truy cập bị chặn - ProDuckX-DNS</title>
+  
+  <!-- Favicon / Title Icon -->
+  <link rel="icon" type="image/png" href="images/produckx.png">
+  
+  <!-- Bootstrap 5 CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  
+  <!-- Bootstrap Icons & FontAwesome 6 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: rgba(22, 27, 34, 0.85);
+      --accent-red: #ff4757;
+      --accent-glow: rgba(255, 71, 87, 0.35);
+      --border-color: #30363d;
+      --text-muted: #8b949e;
+      --text-main: #f0f6fc;
+      --brand-green: #2ecc71;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    /* Hiệu ứng nền Ambient Glow */
+    .bg-glow-1, .bg-glow-2 {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      z-index: 0;
+      pointer-events: none;
+      animation: floatGlow 12s infinite alternate ease-in-out;
+    }
+    .bg-glow-1 {
+      width: 450px;
+      height: 450px;
+      background: radial-gradient(circle, rgba(255, 71, 87, 0.18) 0%, transparent 70%);
+      top: -100px;
+      left: 10%;
+    }
+    .bg-glow-2 {
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(46, 204, 113, 0.12) 0%, transparent 70%);
+      bottom: -150px;
+      right: 10%;
+      animation-delay: -6s;
+    }
+
+    @keyframes floatGlow {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(40px, 30px) scale(1.15); }
+    }
+
+    /* Block Card chính */
+    .block-card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 580px;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 40px 32px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px var(--accent-glow);
+      text-align: center;
+      animation: cardEntrance 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes cardEntrance {
+      0% { opacity: 0; transform: translateY(30px) scale(0.96); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* Logo & Avatar */
+    .brand-logo-wrap {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+    .brand-logo {
+      width: 86px;
+      height: 86px;
+      object-fit: contain;
+      border-radius: 18px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      transition: transform 0.3s ease;
+    }
+    .brand-logo:hover {
+      transform: scale(1.06) rotate(3deg);
+    }
+    .badge-icon {
+      position: absolute;
+      bottom: -6px;
+      right: -6px;
+      width: 32px;
+      height: 32px;
+      background: var(--accent-red);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      border: 2px solid var(--bg-color);
+      box-shadow: 0 4px 10px rgba(255, 71, 87, 0.5);
+      animation: pulseAlert 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseAlert {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); box-shadow: 0 0 18px rgba(255, 71, 87, 0.8); }
+    }
+
+    /* Tiêu đề & Thông điệp */
+    .title {
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+    .subtitle {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    /* Box hiển thị domain bị chặn */
+    .domain-box {
+      background: #0d1117;
+      border: 1px dashed rgba(255, 71, 87, 0.5);
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      word-break: break-all;
+    }
+    .domain-box i {
+      color: var(--accent-red);
+      font-size: 18px;
+    }
+    .domain-name {
+      font-family: monospace;
+      font-size: 16px;
+      font-weight: 600;
+      color: #ffa8a8;
+    }
+
+    /* Bảng chi tiết lý do */
+    .details-list {
+      background: rgba(13, 17, 23, 0.6);
+      border: 1px solid rgba(48, 54, 61, 0.6);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 28px;
+      text-align: left;
+      font-size: 13.5px;
+    }
+    .details-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(48, 54, 61, 0.4);
+    }
+    .details-item:last-child {
+      border-bottom: none;
+    }
+    .details-label {
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .details-val {
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    /* Nút bấm hành động */
+    .btn-action-wrap {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn-custom {
+      padding: 10px 22px;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.25s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      text-decoration: none;
+    }
+    .btn-back {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid var(--border-color);
+    }
+    .btn-back:hover {
+      background: #30363d;
+      color: #fff;
+      transform: translateY(-2px);
+    }
+    .btn-dashboard {
+      background: #238636;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 14px rgba(35, 134, 54, 0.35);
+    }
+    .btn-dashboard:hover {
+      background: #2ea043;
+      color: #fff;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(35, 134, 54, 0.5);
+    }
+
+    /* Footer */
+    .brand-footer {
+      margin-top: 32px;
+      font-size: 12px;
+      color: #6e7681;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .brand-footer span {
+      color: var(--brand-green);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Glow Effects -->
+  <div class="bg-glow-1"></div>
+  <div class="bg-glow-2"></div>
+
+  <!-- Main Card -->
+  <div class="block-card">
+    
+    <!-- Logo & Icon -->
+    <div class="brand-logo-wrap">
+      <img src="images/produckx.png" alt="ProDuckX" class="brand-logo">
+      <div class="badge-icon">
+        <i class="fa-solid fa-ban"></i>
+      </div>
+    </div>
+
+    <!-- Tiêu đề thông báo -->
+    <h1 class="title">Truy Cập Đã Bị Chặn</h1>
+    <p class="subtitle">
+      Tên miền này đã bị tường lửa DNS nhận diện là quảng cáo, mã độc hoặc nằm trong danh sách hạn chế truy cập.
+    </p>
+
+    <!-- Box Tên miền bị chặn (tự động nhận qua URL params hoặc referrer) -->
+    <div class="domain-box">
+      <i class="bi bi-shield-slash-fill"></i>
+      <span class="domain-name" id="blocked-domain">unknown-domain.com</span>
+    </div>
+
+    <!-- Thông tin chi tiết -->
+    <div class="details-list">
+      <div class="details-item">
+        <span class="details-label"><i class="bi bi-shield-check text-success"></i> Hệ thống bảo vệ</span>
+        <span class="details-val">ProDuckX-DNS Filter Engine</span>
+      </div>
+      <div class="details-item">
+        <span class="details-label"><i class="bi bi-exclamation-triangle-fill text-warning"></i> Lý do chặn</span>
+        <span class="details-val" id="block-reason">Quảng cáo / Theo dõi / Độc hại</span>
+      </div>
+      <div class="details-item">
+        <span class="details-label"><i class="bi bi-clock-history text-info"></i> Thời gian phát hiện</span>
+        <span class="details-val" id="block-time">--:--:--</span>
+      </div>
+      <div class="details-item">
+        <span class="details-label"><i class="bi bi-hdd-network text-primary"></i> Trạng thái</span>
+        <span class="details-val text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> DNS Sinkhole Active</span>
+      </div>
+    </div>
+
+    <!-- Nút hành động -->
+    <!-- <div class="btn-action-wrap">
+      <button onclick="window.history.back()" class="btn-custom btn-back">
+        <i class="fa-solid fa-arrow-left"></i> Quay lại an toàn
+      </button>
+      <a href="http://produckx.local" class="btn-custom btn-dashboard" id="btn-admin">
+        <i class="fa-solid fa-gear"></i> Trang quản trị
+      </a>
+    </div> -->
+
+    <!-- Thương hiệu Footer -->
+    <div class="brand-footer">
+      <span>ProDuckX-DNS</span> &bull; Hardware AdBlocker &bull; High Performance Protection
+    </div>
+
+  </div>
+
+  <script>
+    // Hàm lấy tham số từ URL (?domain=example.com hoặc ?d=example.com)
+    function getBlockedDomain() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const d = urlParams.get('domain') || urlParams.get('d') || urlParams.get('url') || urlParams.get('host');
+      if (d) return d;
+
+      // Nếu không có param, thử trích xuất từ document.referrer
+      if (document.referrer) {
+        try {
+          const ref = new URL(document.referrer);
+          return ref.hostname;
+        } catch (_) {}
+      }
+
+      // Mặc định nếu không tìm thấy
+      return window.location.hostname !== 'localhost' && !window.location.hostname.includes('produckx')
+        ? window.location.hostname
+        : 'ad-tracker.blocked-domain.com';
+    }
+
+    // Cập nhật giao diện khi tải trang
+    document.addEventListener('DOMContentLoaded', () => {
+      // Điền tên domain
+      const domainEl = document.getElementById('blocked-domain');
+      domainEl.textContent = getBlockedDomain();
+
+      // Điền thời gian thực
+      const timeEl = document.getElementById('block-time');
+      const now = new Date();
+      timeEl.textContent = now.toLocaleDateString('vi-VN') + ' ' + now.toLocaleTimeString('vi-VN');
+    });
+  </script>
+</body>
+</html>

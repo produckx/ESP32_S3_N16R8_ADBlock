@@ -1,0 +1,9 @@
+# Partition table 16MB flash cho ESP32-S3-N16R8.
+# Single-app + LittleFS lớn để chứa blocklist hàng triệu domain.
+# Firmware slot: 3 MB (0x300000) — đủ chỗ cho TLS (DoH/DoT).
+# LittleFS slot: ~12.2 MB (0xCF0000) -> ~2.5M domain @ 5 bytes.
+# Name,     Type, SubType, Offset,   Size
+nvs,        data, nvs,     0x9000,   0x5000
+otadata,    data, ota,     0xe000,   0x2000
+app0,       app,  ota_0,   0x10000,  0x300000
+spiffs,     data, spiffs,  0x310000, 0xCF0000
