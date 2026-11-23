@@ -99,7 +99,7 @@ table.dataTable td{border-bottom:1px solid #1e293b!important}
   <section class="glass rounded-2xl p-4 anim">
     <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-cloud-arrow-down text-cyan-400"></i><h2 class="font-semibold">Blocklist — Remote update</h2></div>
     <div class="space-y-2">
-      <input id=uurl placeholder="https://host/blocklist.bin" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm">
+      <input id=uurl placeholder="https://host/blocklist.bin" value="https://produckx-adblock.vercel.app/api/download/blocklist.bin" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm">
       <div class="flex flex-wrap items-center gap-2 text-sm">
         <span class="text-slate-400">Hằng ngày lúc</span>
         <input type=time id=uiv value="03:00" class="rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-200">
