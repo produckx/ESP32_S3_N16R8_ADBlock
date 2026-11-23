@@ -91,6 +91,7 @@ uint8_t buf[1536];   // fits any non-fragmented UDP reply (EDNS answers can exce
 
 // Bản sao blocklist trong PSRAM (nạp từ flash lúc boot). blRam != null -> tra RAM.
 static uint8_t* blRam = nullptr;
+static bool blLoading = false;   // true khi đang nạp PSRAM -> tạm fail-open (không chặn)
 
 // first-level flash index (sorted sample hashes) + small direct-mapped cache
 static uint8_t blIndex[INDEX_ENTRIES][HASH_BYTES];
@@ -128,6 +129,7 @@ String updateUrl = "";              // URL of a prebuilt blocklist.bin (e.g. Git
 String updateTime = "03:00";        // giờ địa phương "HH:MM"
 int    lastUpdDay = -1;             // tm_yday của lần fetch gần nhất (chống chạy 2 lần/ngày)
 String updateStatus = "never";
+static volatile bool fetchBusy = false;   // chặn fetch lồng nhau (bấm Fetch now khi đang tải)
 
 // static IP (persisted in /net.cfg; absent = DHCP)
 bool      staticIP = false;
@@ -195,6 +197,8 @@ static void buildFlashIndex() {
 
 // Nạp toàn bộ blocklist từ flash vào PSRAM để tra cứu nhanh (không I/O flash).
 // Không đủ PSRAM -> bỏ trống, inFlash() tự fallback tra flash.
+static bool handleDns();   // forward: cần gọi trong lúc nạp blocklist để không rớt DNS
+
 static void loadBlocklistRam() {
   if (blRam) { free(blRam); blRam = nullptr; }
   if (!blocklist || numHashes == 0) return;
@@ -202,14 +206,24 @@ static void loadBlocklistRam() {
   blRam = (uint8_t*)heap_caps_malloc(sz, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
   if (!blRam) { Serial.println("[ram] PSRAM alloc failed -> tra flash"); return; }
   blocklist.seek(0);
-  size_t got = blocklist.read(blRam, sz);
+  // Đọc theo khối + vẫn phục vụ DNS. blLoading = fail-open: chưa nạp xong thì không chặn.
+  blLoading = true;
+  size_t got = 0;
+  while (got < sz) {
+    size_t n = blocklist.read(blRam + got, sz - got);
+    if (!n) break;
+    got += n;
+    handleDns();
+    web.handleClient();
+  }
+  blLoading = false;
   if (got != sz) { free(blRam); blRam = nullptr; Serial.println("[ram] read short -> tra flash"); return; }
   for (int i = 0; i < CACHE_SIZE; i++) cacheValid[i] = 0;
   Serial.printf("[ram] blocklist nap vao PSRAM: %u bytes\n", (unsigned)sz);
 }
 
 static bool inFlash(uint64_t h) {
-  if (numHashes == 0) return false;
+  if (numHashes == 0 || blLoading) return false;   // đang nạp: fail-open, không chặn nhầm
   if (blRam) {   // binary search trên PSRAM
     uint32_t lo = 0, hi = numHashes;
     while (lo < hi) {
@@ -898,6 +912,8 @@ static bool validBlocklistFile(const char* path, size_t expectSize, String& why)
       if (!first && v <= prev) { f.close(); why = "not a sorted blocklist (entry " + String((unsigned)idx) + ")"; return false; }
       prev = v; first = false;
     }
+    handleDns();   // file lớn: vẫn trả lời DNS trong lúc quét kiểm tra
+    web.handleClient();
   }
   f.close(); return true;
 }
@@ -931,12 +947,14 @@ static void handleUpload() {
     case UPLOAD_FILE_START:
       upAuthOk = web.header(CSRF_HEADER) == CSRF_VALUE && sessionValid();
       if (!upAuthOk) { Serial.println("[ota] blocklist upload: auth/CSRF check failed"); break; }
+      if (fetchBusy) { upAuthOk = false; Serial.println("[ota] blocklist upload: dang tai tu URL, bo qua"); break; }
       upOk = false; beginBlocklistSwap(0);            // ESP32 WebServer has no clientContentLength(); 0 = unknown
       upFile = LittleFS.open("/blocklist.new", "w");
       Serial.printf("[ota] receiving %s\n", u.filename.c_str());
       break;
     case UPLOAD_FILE_WRITE:
       if (upAuthOk && upFile) upFile.write(u.buf, u.currentSize);
+      if (upAuthOk) handleDns();   // upload lớn: vẫn trả lời DNS
       break;
     case UPLOAD_FILE_END:
       if (!upAuthOk) break;
@@ -975,6 +993,8 @@ static void saveUpdateCfg() {
 }
 static bool fetchBlocklist(String url) {
   url.trim(); if (!url.length()) { updateStatus = "no url set"; return false; }
+  if (fetchBusy) { updateStatus = "busy (dang tai)"; return false; }
+  struct BusyGuard { BusyGuard() { fetchBusy = true; } ~BusyGuard() { fetchBusy = false; } } bg;
   Serial.printf("[remote] GET %s\n", url.c_str());
   WiFiClientSecure cs;
   cs.setInsecure();                // blocklist isn't secret -> skip cert pinning
@@ -990,10 +1010,13 @@ static bool fetchBlocklist(String url) {
   File f = LittleFS.open("/blocklist.new", "w");
   if (!f) { http.end(); updateStatus = "fs open failed"; if (!swapKeptLive) reopenBlocklist(); return false; }
   WiFiClient* stream = http.getStreamPtr(); uint8_t b[1024]; size_t total = 0; uint32_t idle = millis();
+  // Vẫn phục vụ DNS + dashboard trong lúc tải (loop() bị chiếm bởi hàm đồng bộ này).
   while (http.connected() && (len < 0 || (int)total < len)) {
     size_t avail = stream->available();
     if (avail) { int n = stream->readBytes(b, avail > sizeof(b) ? sizeof(b) : avail); if (n > 0) { f.write(b, n); total += n; idle = millis(); } }
     else { if (millis() - idle > 15000) break; delay(2); }
+    handleDns();
+    web.handleClient();
   }
   f.close(); http.end();
   String why;
