@@ -100,12 +100,13 @@ table.dataTable td{border-bottom:1px solid #1e293b!important}
     <div class="flex items-center gap-2 mb-3"><i class="fa-solid fa-cloud-arrow-down text-cyan-400"></i><h2 class="font-semibold">Blocklist — Remote update</h2></div>
     <div class="space-y-2">
       <input id=uurl placeholder="https://host/blocklist.bin" class="w-full rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm">
-      <div class="flex items-center gap-2 text-sm">
-        <span class="text-slate-400">Mỗi</span><input id=uiv size=2 value=24 class="w-16 rounded-lg bg-slate-950 border border-slate-700 px-2 py-2 text-center"> <span class="text-slate-400">giờ</span>
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <span class="text-slate-400">Hằng ngày lúc</span>
+        <input type=time id=uiv value="03:00" class="rounded-lg bg-slate-950 border border-slate-700 px-3 py-2 text-sm text-slate-200">
         <button onclick=saveUpd() class="ml-auto rounded-lg bg-slate-700 hover:bg-slate-600 px-3 py-2 text-sm">Save</button>
         <button onclick=fetchNow() class="rounded-lg bg-cyan-600 hover:bg-cyan-500 px-3 py-2 text-sm text-white">Fetch now</button>
       </div>
-      <p class="text-[11px] text-slate-500">Lần cập nhật cuối: <span id=ustat>—</span></p>
+      <p class="text-[11px] text-slate-500">Giờ địa phương (đồng bộ NTP). Lần cập nhật cuối: <span id=ustat>—</span></p>
     </div>
   </section>
 </div>
@@ -148,7 +149,7 @@ table.dataTable td{border-bottom:1px solid #1e293b!important}
 function fmt(n){return (n??0).toLocaleString()}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 const CSRF_HDRS={'X-Requested-With':'produckx-adblock'}
-let netEdited=false,dtClients=null,chartTotals=null,chartClients=null;
+let netEdited=false,updEdited=false,dtClients=null,chartTotals=null,chartClients=null;
 
 // Khởi tạo DataTables + Chart.js; nếu CDN bị chặn thì tự fallback, không vỡ trang.
 try{
@@ -210,8 +211,7 @@ async function load(){
   netstate.textContent=s.staticip?'static':'DHCP';
   if(!netEdited){netip.value=s.netip||'';netgw.value=s.netgw||'';netsn.value=s.netsubnet||'';netdns.value=s.netdns||'';}
   if(document.activeElement!=burl)burl.value=s.blockurl||'';
-  if(document.activeElement!=uurl)uurl.value=s.upurl||'';
-  if(document.activeElement!=uiv)uiv.value=s.upiv||24;
+  if(!updEdited){uurl.value=s.upurl||'';uiv.value=s.upt||'03:00';}
   ustat.textContent=s.upstat||'—';
   if(chartTotals){chartTotals.data.datasets[0].data=[s.blocked,s.allowed];chartTotals.update('none');}
   if(chartClients){
@@ -227,6 +227,7 @@ cl.addEventListener('click',e=>{if(e.target.classList.contains('rmbtn'))fetch('/
 function addWhite(){let d=wdom.value.trim();if(d){fetch('/addwhite?d='+encodeURIComponent(d),{headers:CSRF_HDRS}).then(()=>{wdom.value='';load()})}}
 wl.addEventListener('click',e=>{if(e.target.classList.contains('wrm'))fetch('/unwhite?d='+encodeURIComponent(e.target.dataset.d),{headers:CSRF_HDRS}).then(load)});
 [netip,netgw,netsn,netdns].forEach(el=>el.addEventListener('input',()=>{netEdited=true;}));
+[uiv,uurl].forEach(el=>{el.addEventListener('input',()=>{updEdited=true;});el.addEventListener('change',()=>{updEdited=true;});});
 function saveIP(){let ip=netip.value.trim(),gw=netgw.value.trim(),sn=netsn.value.trim(),dns=netdns.value.trim();
 if(!ip||!gw||!sn||!dns){netmsg.textContent='fill all four fields';return;}
 netmsg.textContent='saving...';netEdited=false;
@@ -237,7 +238,7 @@ fetch('/setdhcp',{headers:CSRF_HDRS}).then(async r=>{netmsg.textContent=r.ok?'�
 function saveBlockUrl(){let u=burl.value.trim();bmsg.textContent='saving...';
 fetch('/setblockurl?u='+encodeURIComponent(u),{headers:CSRF_HDRS}).then(r=>{bmsg.textContent=r.ok?'✓ saved':'✗ failed';load();});}
 function resetBlockUrl(){burl.value='0.0.0.0';saveBlockUrl();}
-function saveUpd(){fetch('/setupdate?u='+encodeURIComponent(uurl.value.trim())+'&h='+(parseInt(uiv.value)||24),{headers:CSRF_HDRS}).then(load)}
+function saveUpd(){updEdited=false;fetch('/setupdate?u='+encodeURIComponent(uurl.value.trim())+'&t='+encodeURIComponent(uiv.value),{headers:CSRF_HDRS}).then(load)}
 function fetchNow(){ustat.textContent='fetching...';fetch('/fetchnow',{headers:CSRF_HDRS}).then(r=>r.text()).then(t=>{ustat.textContent=t;load()})}
 function forgetWifi(){fetch('/forgetwifi',{headers:CSRF_HDRS}).then(r=>r.text()).then(t=>alert(t))}
 upf.onsubmit=async e=>{e.preventDefault();let f=blf.files[0];if(!f)return;

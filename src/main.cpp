@@ -77,6 +77,11 @@ static const uint64_t HASH_MASK = (1ULL << (HASH_BYTES * 8)) - 1;
 #define RGB_LED_PIN 48
 #endif
 
+// ---- timezone cho lịch update hằng ngày (NTP) ----
+#ifndef TZ_INFO
+#define TZ_INFO "ICT-7"   // UTC+7 (VN/TH/ID). Đổi theo nơi đặt thiết bị.
+#endif
+
 // ---- globals ----
 WiFiUDP dnsServer, upstreamCli;
 WebServer web(80);
@@ -118,10 +123,10 @@ HistEntry hist[MAX_HIST]; int histCount = 0, histHead = 0;
 static const int MAX_BAN = 32;
 uint32_t bannedIP[MAX_BAN]; int numBanned = 0;
 
-// remote blocklist auto-update
+// remote blocklist auto-update — chạy hằng ngày vào giờ:phút cấu hình (cần NTP)
 String updateUrl = "";              // URL of a prebuilt blocklist.bin (e.g. GitHub release asset)
-uint32_t updateIntervalH = 24;      // hours between auto-fetches
-uint32_t lastCheckMs = 0;
+String updateTime = "03:00";        // giờ địa phương "HH:MM"
+int    lastUpdDay = -1;             // tm_yday của lần fetch gần nhất (chống chạy 2 lần/ngày)
 String updateStatus = "never";
 
 // static IP (persisted in /net.cfg; absent = DHCP)
@@ -794,7 +799,7 @@ static void handleStats() {
              ",\"heap\":" + freeHeap + ",\"ram\":" + String(ramPct, 1) + ",\"cpu\":" + String(cpuPct, 1) +
              ",\"uptime\":\"" + ut + "\"" +
              ",\"dns\":\"" + upstreamDns.toString() + "\",\"dnsSource\":\"" + upstreamSource + "\"" +
-             ",\"upurl\":\"" + jesc(updateUrl) + "\",\"upiv\":" + updateIntervalH + ",\"upstat\":\"" + jesc(updateStatus) + "\"" +
+             ",\"upurl\":\"" + jesc(updateUrl) + "\",\"upt\":\"" + jesc(updateTime) + "\",\"upstat\":\"" + jesc(updateStatus) + "\"" +
              ",\"blocking\":" + (blockingOn ? "true" : "false") +
              ",\"resumeIn\":" + (uint32_t)(!blockingOn && resumeAt ? (resumeAt - millis()) / 1000 : 0) +
              ",\"defcreds\":" + ((strcmp(WEB_PASS, "CHANGE_ME_WEB_PASSWORD") == 0 || strcmp(OTA_PASS, "CHANGE_ME_OTA_PASSWORD") == 0) ? "true" : "false") +
@@ -949,15 +954,24 @@ static void handleUpload() {
 }
 
 // ---------- remote blocklist auto-update ----------
+// "HH:MM" -> giờ/phút; false nếu sai định dạng.
+static bool parseHM(const String& s, int& h, int& m) {
+  int c = s.indexOf(':'); if (c < 1) return false;
+  h = s.substring(0, c).toInt(); m = s.substring(c + 1).toInt();
+  return h >= 0 && h < 24 && m >= 0 && m < 60;
+}
 static void loadUpdateCfg() {
   File f = LittleFS.open("/update.cfg", "r"); if (!f) return;
   updateUrl = f.readStringUntil('\n'); updateUrl.trim();
-  String iv = f.readStringUntil('\n'); iv.trim(); if (iv.length()) updateIntervalH = iv.toInt();
-  f.close(); if (updateIntervalH < 1) updateIntervalH = 1;
+  String t = f.readStringUntil('\n'); t.trim();
+  int h, m;
+  if (t.indexOf(':') < 0) t = String(((t.toInt() % 24) + 24) % 24) + ":00";  // file cũ: số giờ
+  if (parseHM(t, h, m)) updateTime = t;
+  f.close();
 }
 static void saveUpdateCfg() {
   File f = LittleFS.open("/update.cfg", "w"); if (!f) return;
-  f.println(updateUrl); f.println(updateIntervalH); f.close();
+  f.println(updateUrl); f.println(updateTime); f.close();
 }
 static bool fetchBlocklist(String url) {
   url.trim(); if (!url.length()) { updateStatus = "no url set"; return false; }
@@ -1229,6 +1243,7 @@ void setup() {
   upstreamApply();                              // DHCP is up now (matters for "router" mode)
   Serial.printf("upstream DNS: %s (%s)\n", upstreamDns.toString().c_str(), upstreamSource);
   if (MDNS.begin("produckx")) { MDNS.addService("http", "tcp", 80); Serial.println("dashboard: http://produckx.local"); }
+  configTzTime(TZ_INFO, "pool.ntp.org", "time.cloudflare.com");   // giờ cho lịch update
 
   if (strcmp(WEB_PASS, "CHANGE_ME_WEB_PASSWORD") == 0 || strcmp(OTA_PASS, "CHANGE_ME_OTA_PASSWORD") == 0)
     Serial.println("[WARN] secrets.h still has placeholder WEB_PASS/OTA_PASS — those are public "
@@ -1286,7 +1301,12 @@ void setup() {
   web.on("/setupdate", []() {
     if (!requireAuth()) return;
     if (web.hasArg("u")) updateUrl = web.arg("u");
-    if (web.hasArg("h")) { updateIntervalH = web.arg("h").toInt(); if (updateIntervalH < 1) updateIntervalH = 1; }
+    if (web.hasArg("t")) {
+      String t = web.arg("t"); t.trim();
+      int h, m;
+      if (!parseHM(t, h, m)) { web.send(400, "text/plain", "gio phai dang HH:MM"); return; }
+      updateTime = t; lastUpdDay = -1;   // đổi giờ -> cho phép chạy lại trong ngày
+    }
     saveUpdateCfg(); web.send(200, "text/plain", "ok");
   });
   web.on("/setdns", []() {               // /setdns?ip=|?router=1|?reset=1|?doh=<url>|?dot=<host>
@@ -1361,10 +1381,14 @@ void loop() {
   ledStatus();
   bool busy = handleDns();
   if (!blockingOn && resumeAt && (int32_t)(millis() - resumeAt) >= 0) { blockingOn = true; resumeAt = 0; }
-  if (updateUrl.length()) {               // periodic remote blocklist auto-update
-    uint32_t now = millis();
-    if (lastCheckMs == 0) lastCheckMs = now;   // skip an immediate fetch on boot
-    else if (now - lastCheckMs >= updateIntervalH * 3600000UL) { lastCheckMs = now; fetchBlocklist(updateUrl); }
+  if (updateUrl.length()) {               // update hằng ngày theo giờ:phút (NTP)
+    struct tm t;
+    int h, m;
+    if (getLocalTime(&t, 0) && parseHM(updateTime, h, m) && t.tm_yday != lastUpdDay &&
+        (t.tm_hour > h || (t.tm_hour == h && t.tm_min >= m))) {
+      lastUpdDay = t.tm_yday;
+      fetchBlocklist(updateUrl);
+    }
   }
   if (!busy) delay(1);   // sleep only when idle: full speed under load, cool when quiet
 }
