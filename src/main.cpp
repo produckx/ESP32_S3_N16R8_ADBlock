@@ -404,11 +404,12 @@ static bool getMac(uint32_t ip, uint8_t* mac) {
   ip4_addr_t ipa; ipa.addr = ip;
   struct eth_addr* eth = nullptr; const ip4_addr_t* ipret = nullptr;
   for (struct netif* nif = netif_list; nif; nif = nif->next) {
+    // etharp_* requires an Ethernet ARP interface with a six-byte hardware address.
+    if (!netif_is_up(nif) || !(nif->flags & NETIF_FLAG_ETHARP) || nif->hwaddr_len != ETHARP_HWADDR_LEN) continue;
     if (etharp_find_addr(nif, &ipa, &eth, &ipret) >= 0 && eth) {
-      memcpy(mac, eth->addr, 6);
+      memcpy(mac, eth->addr, ETHARP_HWADDR_LEN);
       return true;
     }
-    // If not in ARP cache, proactively send ARP request to discover it
     etharp_request(nif, &ipa);
   }
   return false;
@@ -725,6 +726,34 @@ static String newSessionToken() {
   }
   return String(t);
 }
+
+// RAM-only lockout: 5 lần sai trong 60 giây -> khóa IP 5 phút.
+static const int MAX_LOGIN_TRACK = 16;
+static const uint32_t LOGIN_WINDOW_MS = 60000UL, LOGIN_LOCK_MS = 300000UL;
+struct LoginTrack { uint32_t ip, windowAt, blockedUntil; uint8_t failures; };
+static LoginTrack loginTrack[MAX_LOGIN_TRACK] = {};
+static LoginTrack* loginState(uint32_t ip, bool create) {
+  LoginTrack* freeSlot = nullptr;
+  uint32_t now = millis();
+  for (auto& s : loginTrack) {
+    if (s.ip == ip) return &s;
+    if (!s.ip || (s.blockedUntil && (int32_t)(now - s.blockedUntil) >= 0) ||
+        (s.windowAt && now - s.windowAt >= LOGIN_WINDOW_MS)) freeSlot = &s;
+  }
+  if (!create || !freeSlot) return nullptr;
+  *freeSlot = {ip, 0, 0, 0};
+  return freeSlot;
+}
+static bool loginIsBlocked(uint32_t ip) {
+  LoginTrack* s = loginState(ip, false);
+  return s && s->blockedUntil && (int32_t)(millis() - s->blockedUntil) < 0;
+}
+static void loginFailed(uint32_t ip) {
+  LoginTrack* s = loginState(ip, true); if (!s) return;
+  uint32_t now = millis();
+  if (!s->windowAt || now - s->windowAt >= LOGIN_WINDOW_MS) { s->windowAt = now; s->failures = 0; }
+  if (++s->failures >= 5) { s->blockedUntil = now + LOGIN_LOCK_MS; s->failures = 0; }
+}
 static void sendLoginPage(const String& err) {
   String html =
     "<!doctype html><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
@@ -753,7 +782,10 @@ static void sendLoginPage(const String& err) {
   web.send(200, "text/html", html);
 }
 static void handleLoginPost() {
+  uint32_t ip = (uint32_t)web.client().remoteIP();
+  if (loginIsBlocked(ip)) { web.send(429, "text/plain", "too many login attempts; try again in 5 minutes"); return; }
   if (web.arg("u") == WEB_USER && web.arg("p") == WEB_PASS) {
+    if (LoginTrack* s = loginState(ip, false)) *s = {};
     sessionToken = newSessionToken();
     sessionExpireMs = millis() + SESSION_TTL_MS;
     web.sendHeader("Set-Cookie", String(SESSION_COOKIE) + "=" + sessionToken + "; Max-Age=7200; Path=/; HttpOnly");
@@ -762,7 +794,9 @@ static void handleLoginPost() {
     Serial.println("[web] login ok");
     return;
   }
-  Serial.println("[web] login failed");
+  loginFailed(ip);
+  Serial.printf("[web] login failed from %s\n", IPAddress(ip).toString().c_str());
+  if (loginIsBlocked(ip)) { web.send(429, "text/plain", "too many login attempts; try again in 5 minutes"); return; }
   web.sendHeader("Set-Cookie", String(SESSION_COOKIE) + "=; Max-Age=0; Path=/");
   sendLoginPage("Incorrect username or password");
 }
@@ -1275,7 +1309,12 @@ void setup() {
 
   dnsServer.begin(DNS_PORT); upstreamCli.begin(0);
   { const char* hdrs[] = { CSRF_HEADER, "Cookie", "Host" }; web.collectHeaders(hdrs, 3); }  // CSRF header + session cookie + Host
-  web.on("/login", HTTP_GET, []() { sendLoginPage(""); });
+  web.on("/login", HTTP_GET, []() {
+    if (loginIsBlocked((uint32_t)web.client().remoteIP())) {
+      web.send(429, "text/plain", "too many login attempts; try again in 5 minutes"); return;
+    }
+    sendLoginPage("");
+  });
   web.on("/login", HTTP_POST, handleLoginPost);
   web.on("/logout", []() {
     sessionToken = "";
