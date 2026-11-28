@@ -11,3 +11,6 @@ static const char* WIFI_PASS = "WiFi Password";
 static const char* WEB_USER = "admin";
 static const char* WEB_PASS = "Web Password";
 static const char* OTA_PASS = "OTA Password";
+
+// Thời gian duy trì đăng nhập Dashboard (tính theo giờ, ví dụ: 24 = 1 ngày, 168 = 7 ngày)
+static const uint32_t SESSION_HOURS = 24;

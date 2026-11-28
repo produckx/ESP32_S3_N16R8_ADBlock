@@ -700,7 +700,10 @@ static String htmlEscape(const String& s) {
 // Basic Auth credentials cross-origin, whereas this cookie + the CSRF header
 // does not, and it gives the dashboard a real logged-in / logged-out state.
 static const char*    SESSION_COOKIE = "c3sid";
-static const uint32_t SESSION_TTL_MS = 2UL * 60UL * 60UL * 1000UL;   // 2 hours
+#ifndef SESSION_HOURS
+#define SESSION_HOURS 2
+#endif
+static const uint32_t SESSION_TTL_MS = (uint32_t)SESSION_HOURS * 3600UL * 1000UL;
 static String         sessionToken = "";       // current valid id ("" = logged out)
 static uint32_t       sessionExpireMs = 0;     // millis() at which it dies
 
@@ -788,7 +791,7 @@ static void handleLoginPost() {
     if (LoginTrack* s = loginState(ip, false)) *s = {};
     sessionToken = newSessionToken();
     sessionExpireMs = millis() + SESSION_TTL_MS;
-    web.sendHeader("Set-Cookie", String(SESSION_COOKIE) + "=" + sessionToken + "; Max-Age=7200; Path=/; HttpOnly");
+    web.sendHeader("Set-Cookie", String(SESSION_COOKIE) + "=" + sessionToken + "; Max-Age=" + String((uint32_t)SESSION_HOURS * 3600UL) + "; Path=/; HttpOnly");
     web.sendHeader("Location", "/");
     web.send(302, "text/plain", "");
     Serial.println("[web] login ok");
